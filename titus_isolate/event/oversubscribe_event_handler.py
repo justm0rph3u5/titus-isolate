@@ -104,7 +104,11 @@ class OversubscribeEventHandler(EventHandler, MetricsReporter):
             clean_count = self.__window_publisher.cleanup()
             log.info('cleaned up %d old opportunistic resources', clean_count)
 
-            if self.__window_publisher.is_window_active():
+            window_length_minutes = self.__config_manager.get_int(
+                OVERSUBSCRIBE_WINDOW_SIZE_MINUTES_KEY,
+                DEFAULT_OVERSUBSCRIBE_WINDOW_SIZE_MINUTES)
+
+            if self.__window_publisher.is_window_active(window_length_minutes * 60):
                 self.__skip_count += 1
                 self.handled_event(event, 'skipping oversubscribe - a window is currently active')
                 return

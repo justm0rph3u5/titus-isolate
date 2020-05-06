@@ -37,7 +37,7 @@ class TestOpportunisticWindowPublisher(OpportunisticWindowPublisher):
         self.add_window_count = 0
         self.cleanup_count = 0
 
-    def is_window_active(self) -> bool:
+    def is_window_active(self, window_length_sec: int) -> bool:
         self.is_window_active_count += 1
         return self.is_window_active_func()
 

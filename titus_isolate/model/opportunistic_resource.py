@@ -12,7 +12,8 @@ OPPORTUNISTIC_RESOURCE_NAME = OPPORTUNISTIC_RESOURCE_PLURAL + '.' + OPPORTUNISTI
 OPPORTUNISTIC_RESOURCE_NODE_NAME_LABEL_KEY = 'node_name'
 OPPORTUNISTIC_RESOURCE_NODE_UID_LABEL_KEY = 'node_uid'
 
-class OpportunisticResource():
+
+class OpportunisticResource:
     openapi_types = {
         'api_version': 'str',
         'kind': 'str',

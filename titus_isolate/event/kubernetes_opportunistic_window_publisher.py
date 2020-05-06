@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import datetime, timedelta
 from threading import Thread, Lock
 
@@ -10,7 +11,7 @@ from kubernetes import watch
 
 from titus_isolate import log
 from titus_isolate.config.constants import EC2_INSTANCE_ID, OVERSUBSCRIBE_CLEANUP_AFTER_SECONDS_KEY, \
-    DEFAULT_OVERSUBSCRIBE_CLEANUP_AFTER_SECONDS
+    DEFAULT_OVERSUBSCRIBE_CLEANUP_AFTER_SECONDS, OVERSUBSCRIBE_DELAY_SECONDS_KEY, DEFAULT_OVERSUBSCRIBE_DELAY_SECONDS
 from titus_isolate.event.opportunistic_window_publisher import OpportunisticWindowPublisher
 from titus_isolate.event.utils import unix_time_millis, is_int
 from titus_isolate.model.opportunistic_resource import OPPORTUNISTIC_RESOURCE_NAMESPACE, \
@@ -26,8 +27,9 @@ KUBECONFIG_ENVVAR = 'KUBECONFIG'
 DEFAULT_KUBECONFIG_PATH = '/run/kubernetes/config'
 
 ADDED = "ADDED"
+MODIFIED = "MODIFIED"
 DELETED = "DELETED"
-HANDLED_EVENT_TYPES = [ADDED, DELETED]
+HANDLED_EVENT_TYPES = [ADDED, MODIFIED, DELETED]
 
 
 class KubernetesOpportunisticWindowPublisher(OpportunisticWindowPublisher):
@@ -48,6 +50,11 @@ class KubernetesOpportunisticWindowPublisher(OpportunisticWindowPublisher):
 
         watch_thread = Thread(target=self.__watch)
         watch_thread.start()
+
+        self.__start_time = datetime.utcnow()
+        self.__publishing_start_delay_sec = self.__config_manager.get_int(
+            OVERSUBSCRIBE_DELAY_SECONDS_KEY,
+            DEFAULT_OVERSUBSCRIBE_DELAY_SECONDS)
 
     @staticmethod
     def get_kubeconfig_path():
@@ -78,25 +85,39 @@ class KubernetesOpportunisticWindowPublisher(OpportunisticWindowPublisher):
                     label_selector=label_selector)
 
                 for event in stream:
-                    log.info("Event: %s", event)
-
                     event_type = event['type']
                     if event_type not in HANDLED_EVENT_TYPES:
-                        log.warning('Ignoring watch event: %s', event_type)
+                        # Must silently drop unhandled events here, because some ERROR events are expected and
+                        # extremely voluminous
                         continue
 
+                    log.info("Handling event: %s", event)
                     event_metadata_name = event['object']['metadata']['name']
 
                     with self.__lock:
-                        if event_type == 'ADDED':
+                        if event_type == ADDED or event_type == MODIFIED:
                             self.__opportunistic_resources[event_metadata_name] = event
-                        elif event_type == 'DELETED':
+                        elif event_type == DELETED:
                             self.__opportunistic_resources.pop(event_metadata_name, None)
 
             except Exception:
                 log.exception("Watch of opportunistic resources failed")
 
-    def is_window_active(self) -> bool:
+    def __startup_is_complete(self) -> bool:
+        #TODO: delete the line below
+        now = datetime.utcnow()
+        age_sec = (now - self.__start_time).seconds
+        if age_sec < self.__publishing_start_delay_sec:
+            log.warning("Not publishing windows yet publisher_age < publisher_start_delay: %s < %s",
+                        age_sec, self.__publishing_start_delay_sec)
+            return False
+
+        return True
+
+    def is_window_active(self, window_length_sec: int) -> bool:
+        if not self.__startup_is_complete():
+            return True
+
         with self.__lock:
             log.debug('is active: oppo list: %s', json.dumps(self.__opportunistic_resources))
             for item in self.__opportunistic_resources.values():
@@ -115,19 +136,21 @@ class KubernetesOpportunisticWindowPublisher(OpportunisticWindowPublisher):
             if check_secs <= 0:
                 log.info('configured to skip cleanup. opportunistic resource windows will not be deleted.')
                 return 0
+
             for item in self.__opportunistic_resources.values():
                 check_time = datetime.utcnow() - timedelta(seconds=check_secs)
                 if check_time < self.__get_timestamp(item['object']['spec']['window']['end']):
                     continue
-                log.debug('deleting: %s', json.dumps(item))
-                delete_opts = V1DeleteOptions(grace_period_seconds=0, propagation_policy='Foreground')
+                log.info('deleting: %s', json.dumps(item))
+                delete_opts = V1DeleteOptions(grace_period_seconds=0, propagation_policy='Background')
+                event_metadata_name = item['object']['metadata']['name']
                 resp = self.__custom_api.delete_namespaced_custom_object(version=OPPORTUNISTIC_RESOURCE_VERSION,
                                                                          group=OPPORTUNISTIC_RESOURCE_GROUP,
                                                                          plural=OPPORTUNISTIC_RESOURCE_PLURAL,
                                                                          namespace=OPPORTUNISTIC_RESOURCE_NAMESPACE,
-                                                                         name=item['object']['metadata']['name'],
+                                                                         name=event_metadata_name,
                                                                          body=delete_opts)
-                log.debug('deleted: %s', json.dumps(resp))
+                log.info('deleted: %s', json.dumps(resp))
                 clean_count += 1
 
             return clean_count

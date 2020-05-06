@@ -1,13 +1,11 @@
 from abc import abstractmethod
 from datetime import datetime
 
-from kubernetes.client import V1Node
-
 
 class OpportunisticWindowPublisher:
 
     @abstractmethod
-    def is_window_active(self) -> bool:
+    def is_window_active(self, window_length_sec: int) -> bool:
         pass
 
     @abstractmethod

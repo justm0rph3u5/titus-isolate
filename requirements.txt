@@ -24,7 +24,7 @@ lightgbm==2.2.3
 MarkupSafe==2.0.1
 netflix-spectator-py==0.1.17
 numpy==1.19.4
-oauthlib==3.2.0
+oauthlib==3.2.1
 osqp==0.6.2.post5
 pandas==0.24.1
 pkg_resources==0.0.0

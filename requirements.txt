@@ -18,17 +18,17 @@ importlib-metadata==4.8.3
 itsdangerous==2.0.1
 Jinja2==3.0.3
 jmespath==0.10.0
-joblib==1.1.0
+joblib==1.1.1
 kubernetes==23.6.0
 lightgbm==2.2.3
 MarkupSafe==2.0.1
 netflix-spectator-py==0.1.17
-numpy==1.19.4
+numpy==1.22.2
 oauthlib==3.2.0
 osqp==0.6.2.post5
 pandas==0.24.1
 pkg_resources==0.0.0
-protobuf==3.19.4
+protobuf==3.19.5
 pyasn1==0.4.8
 pyasn1-modules==0.2.8
 python-dateutil==2.8.2
@@ -52,3 +52,4 @@ urllib3==1.26.8
 websocket-client==1.2.3
 Werkzeug==2.0.2
 zipp==3.6.0
+setuptools>=65.5.1 # not directly required, pinned by Snyk to avoid a vulnerability

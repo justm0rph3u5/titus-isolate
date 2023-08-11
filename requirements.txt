@@ -11,7 +11,7 @@ ecos==2.0.10
 Flask==2.0.2
 future==0.18.2
 google-auth==2.5.0
-grpcio==1.43.0
+grpcio==1.53.2
 grpcio-tools==1.43.0
 idna==3.3
 importlib-metadata==4.8.3

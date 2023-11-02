@@ -10,3 +10,4 @@ netflix-spectator-py==0.1.17
 kubernetes
 grpcio
 grpcio-tools
+werkzeug>=3.0.1 # not directly required, pinned by Snyk to avoid a vulnerability
